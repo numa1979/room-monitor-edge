@@ -43,7 +43,7 @@
 ### 3.1 カメラ・映像取得
 - Webカメラ `/dev/video0`
 - フレームレート： 3〜10fps（AI推論用）
-- UIはMJPEG/WebSocketで映像ストリーム提供
+- UIはFastAPIのMJPEGエンドポイント(`/camera/stream`)でプレビュー配信
 
 ### 3.2 人物検出・姿勢推定
 - Ultralytics YOLOでperson検出
@@ -110,6 +110,12 @@ jetson-watchdog/
 ├─ web_server.py        # UIサーバ
 └─ README.md
 ```
+
+### 5.3 Webカメラプレビュー実装（FastAPI）
+- `app/camera.py` でUSBカメラ(`/dev/video0`)からの映像を常時取得しJPEG化
+- `app/main.py` に `CameraStreamer` を常駐させ、 `/camera/stream` で `multipart/x-mixed-replace` (MJPEG) を配信
+- `templates/index.html` に `<img src="/camera/stream">` を配置し、Jetson直結カメラ映像をWeb UI上で即時プレビュー
+- カメラ断の際はUI上で警告を出し、接続確認を促す
 
 ---
 

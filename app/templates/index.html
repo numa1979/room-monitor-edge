@@ -62,6 +62,24 @@
         li {
             margin-bottom: 0.35rem;
         }
+        .camera-preview {
+            margin-top: 0.75rem;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #05070f;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .camera-preview img {
+            display: block;
+            width: 100%;
+            height: auto;
+            background: #05070f;
+        }
+        .camera-status {
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+        }
     </style>
 </head>
 <body>
@@ -70,6 +88,15 @@
     <p>{{ app_description }}</p>
 </header>
 <main>
+    <section class="card">
+        <span class="tag">ライブ映像</span>
+        <div class="camera-preview">
+            <img id="cameraFeed" src="/camera/stream" alt="Jetson camera preview">
+        </div>
+        <p class="camera-status" id="cameraStatus">
+            USBカメラの映像をMJPEG形式で配信しています。
+        </p>
+    </section>
     <section class="card">
         <span class="tag">接続状態</span>
         <p class="status">ONLINE</p>
@@ -92,5 +119,25 @@
 <footer>
     &copy; {{ now.year }} Jetson Watchdog Prototype
 </footer>
+<script>
+    const feed = document.getElementById("cameraFeed");
+    const status = document.getElementById("cameraStatus");
+
+    if (feed && status) {
+        let failureTimer = null;
+
+        const markError = () => {
+            status.textContent = "映像を取得できません。カメラ接続とデバイスパス(/dev/video0)を確認してください。";
+        };
+
+        feed.addEventListener("error", markError);
+        feed.addEventListener("load", () => {
+            clearTimeout(failureTimer);
+            status.textContent = "USBカメラの映像をMJPEG形式で配信しています。";
+        });
+
+        failureTimer = setTimeout(markError, 5000);
+    }
+</script>
 </body>
 </html>

@@ -32,6 +32,16 @@ container_exists() {
 }
 
 start_container() {
+  local device_args=()
+  for dev in /dev/video*; do
+    [[ -e "$dev" ]] || continue
+    device_args+=("--device" "${dev}:${dev}")
+  done
+
+  if ((${#device_args[@]} == 0)); then
+    info "/dev/video* が見つかりません。カメラをコンテナへ渡せません。"
+  fi
+
   if ! container_exists; then
     info "Ubuntu 22.04 コンテナ ${CONTAINER_NAME} を生成"
     "${DOCKER[@]}" pull "$IMAGE_NAME"
@@ -42,6 +52,7 @@ start_container() {
       -p "${HOST_PORT}:${CONTAINER_PORT}" \
       -p "${SSH_PORT}:22" \
       -v "$REPO_ROOT:/workspace" \
+      "${device_args[@]}" \
       -w /workspace \
       "$IMAGE_NAME" \
       bash -c "tail -f /dev/null" >/dev/null

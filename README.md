@@ -32,6 +32,13 @@ ssh -p 2222 <Jetsonのホストユーザー>@<JetsonのIP>
 ```
 接続後は `/workspace` を開く。
 
+### USBカメラのパススルー確認
+- `setup_dev.sh` は `/dev/video*` をすべて 22.04 コンテナへ `--device /dev/videoN:/dev/videoN` で渡す。  
+- Jetson ホストで `ls /dev/video*` を実行してカメラが検出されているか確認。見つからない場合はケーブルや電源を確認。  
+- 既存コンテナをこの変更前に作成していた場合は `docker rm -f jetson-watchdog-ubuntu2204` を実行し、`./jetson_setup_scripts/setup_dev.sh` を再実行して再作成する。  
+- コンテナ内で `ls /dev/video*` を実行してパスが見えること、`v4l2-ctl --list-formats-ext` などで MJPEG が有効なことを確認。  
+- それでも映らない場合は `docker logs jetson-watchdog-ubuntu2204` で FastAPI のログを確認。`CameraStreamer` が `/dev/video0` を開けていない場合はホスト側で使用中のアプリがないかを見直す。
+
 ### SSH クライアント例
 （Windows/WLS/mac いずれもほぼ同じ設定です）
 ```
