@@ -3,7 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
+REPO_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
 VENDOR_DRIVER_DIR=${VENDOR_DRIVER_DIR:-$REPO_ROOT/vendor/rtl88x2bu}
 VENDOR_ARCHIVE=${VENDOR_ARCHIVE:-$REPO_ROOT/vendor/rtl88x2bu.tar.gz}
 VENDOR_COMMIT_FILE=${VENDOR_COMMIT_FILE:-$REPO_ROOT/vendor/rtl88x2bu.COMMIT}
