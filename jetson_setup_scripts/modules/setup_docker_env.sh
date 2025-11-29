@@ -10,6 +10,18 @@ HOST_PORT=${HOST_PORT:-8080}
 CONTAINER_PORT=${CONTAINER_PORT:-8080}
 SSH_PORT=${SSH_PORT:-2222}
 VENV_PATH=${VENV_PATH:-/opt/jetson_watchdog_venv}
+SKIP_APT_INSTALL=${SKIP_APT_INSTALL:-0}
+PIP_WHEEL_DIR=${PIP_WHEEL_DIR:-}
+OFFLINE_INSTALL=${OFFLINE_INSTALL:-0}
+DEFAULT_WHEEL_DIR=${DEFAULT_WHEEL_DIR:-$REPO_ROOT/vendor/wheels}
+
+if [[ "$OFFLINE_INSTALL" == "1" ]]; then
+  info "OFFLINE_INSTALL=1: apt install をスキップし、ローカルホイールを優先"
+  SKIP_APT_INSTALL=1
+  if [[ -z "$PIP_WHEEL_DIR" ]]; then
+    PIP_WHEEL_DIR="$DEFAULT_WHEEL_DIR"
+  fi
+fi
 APP_ENTRY="uvicorn app.main:app --host 0.0.0.0 --port ${CONTAINER_PORT}"
 
 info() { printf '\033[1;34m[docker]\033[0m %s\n' "$*"; }
@@ -70,11 +82,45 @@ exec_root() {
 
 prepare_runtime() {
   info "Python 実行環境を準備"
-  exec_root "apt-get update"
-  exec_root "DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-venv python3-pip git curl"
+  if [[ "$SKIP_APT_INSTALL" == "1" ]]; then
+    info "SKIP_APT_INSTALL=1 のため apt-get update/install をスキップ"
+  else
+    exec_root "apt-get update"
+    exec_root "DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-venv python3-pip git curl libgl1"
+  fi
+
   exec_root "mkdir -p /workspace && test -d ${VENV_PATH} || python3 -m venv ${VENV_PATH}"
-  exec_root "source ${VENV_PATH}/bin/activate && pip install --upgrade pip"
-  exec_root "cd /workspace && source ${VENV_PATH}/bin/activate && pip install -r requirements.txt"
+  local use_local_wheels=0
+  if [[ -n "$PIP_WHEEL_DIR" ]]; then
+    if [[ -d "$PIP_WHEEL_DIR" ]]; then
+      use_local_wheels=1
+    else
+      err "指定された PIP_WHEEL_DIR=${PIP_WHEEL_DIR} が存在しません"
+      exit 1
+    fi
+  fi
+
+  if [[ "$use_local_wheels" == "1" ]]; then
+    info "ローカルホイール ${PIP_WHEEL_DIR} から pip install (--no-index)"
+  else
+    if ! exec_root "source ${VENV_PATH}/bin/activate && pip install --upgrade pip"; then
+      info "pip install --upgrade pip に失敗しました。ネットワークまたはAPTキャッシュを確認してください。"
+    fi
+  fi
+
+  if [[ "$use_local_wheels" == "1" ]]; then
+    exec_root "cd /workspace && source ${VENV_PATH}/bin/activate && pip install --no-index --find-links ${PIP_WHEEL_DIR} -r requirements.txt"
+  else
+    if ! exec_root "cd /workspace && source ${VENV_PATH}/bin/activate && pip install -r requirements.txt"; then
+      if [[ -d "$DEFAULT_WHEEL_DIR" ]]; then
+        info "オンライン pip install に失敗。${DEFAULT_WHEEL_DIR} から再試行します"
+        exec_root "cd /workspace && source ${VENV_PATH}/bin/activate && pip install --no-index --find-links ${DEFAULT_WHEEL_DIR} -r requirements.txt"
+      else
+        err "pip install -r requirements.txt に失敗しました。PIP_WHEEL_DIR か DEFAULT_WHEEL_DIR を準備してください。"
+        exit 1
+      fi
+    fi
+  fi
 }
 
 start_app() {

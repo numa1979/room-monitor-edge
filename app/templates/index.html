@@ -112,12 +112,13 @@
         <p>Jetsonが応答中です。ここから監視UIを作り込んでいきます。</p>
     </section>
     <section class="card">
-        <h2>今後追加するもの</h2>
-        <ul>
-            <li>カメラ映像のライブ表示</li>
-            <li>転倒/徘徊イベントの検知と通知</li>
-            <li>しきい値・監視対象の設定UI</li>
-        </ul>
+        <span class="tag">推論結果プレビュー</span>
+        <div class="camera-preview">
+            <img id="inferenceFeed" src="/camera/stream" alt="Inference preview">
+        </div>
+        <p class="camera-status">
+            将来的にはバウンディングボックスや姿勢推定のオーバーレイ結果をここに表示します。現在はライブ映像と同じストリームを参照しています。
+        </p>
     </section>
     <section class="card">
         <h2>サーバ情報</h2>
