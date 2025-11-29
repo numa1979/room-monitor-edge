@@ -15,7 +15,7 @@ APP_ENTRY="uvicorn app.main:app --host 0.0.0.0 --port ${CONTAINER_PORT}"
 info() { printf '\033[1;34m[docker]\033[0m %s\n' "$*"; }
 err() { printf '\033[1;31m[docker ERROR]\033[0m %s\n' "$*" >&2; }
 
-command -v docker >/dev/null 2>&1 || { err "docker コマンドがありません"; exit 1; }
+command -v docker >/dev/null 2>&1 || { err "docker コマンドがありません。"; exit 1; }
 DOCKER=(docker)
 if ! "${DOCKER[@]}" ps >/dev/null 2>&1; then
   if sudo docker ps >/dev/null 2>&1; then
