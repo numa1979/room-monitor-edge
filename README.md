@@ -4,12 +4,16 @@ Jetson Nano 上で動かす見守り AI システムの最初のひな形です�
 
 ## クイックスタート
 
-初期化した Jetson での一連の流れ:
+初期化した Jetson での一連の流れ (JetPack 4.6.1 SD イメージ前提):
 
-1. Jetson ホスト (JetPack Ubuntu18) で `jetson_setup.sh` を実行し、日本語 / Wi-Fi 等を整える  
-2. `jetson_docker_env.sh` を実行して Ubuntu 22.04 コンテナ + FastAPI を起動 (`8080` 露出、`2222` は後述の SSH 用)  
-3. リモート開発したい場合は `jetson_remote-ssh-setup.sh` でコンテナ内に openssh-server + ユーザーをセット  
-4. PC から `ssh -p 2222 dev@<Jetson IP>` あるいは VS Code Remote-SSH で接続し、`/workspace` 内のソースを編集  
+1. microSD を Jetson に挿し、有線 LAN で起動して Ubuntu 18.04 初期セットアップを完了する  
+2. `room-monitor-edge` をクローンする  
+3. **開発時:** `jetson_setup_scripts/setup_dev.sh` を実行  
+   - Wi-Fi ドライバ + 接続、日本語入力、Ubuntu 22.04 コンテナ起動、VS Code Remote-SSH (2222/tcp) を構築  
+4. **配布時:** `jetson_setup_scripts/setup_prod.sh` を実行  
+   - 依存パッケージと Docker ベースの FastAPI アプリだけを起動（LAN 接続のままで OK）  
+
+`setup_dev.sh` 実行後は `ssh -p 2222 dev@<JetsonのIP>` で 22.04 コンテナへ入って開発できます。`setup_prod.sh` は再起動後も自動で FastAPI が立ち上がる状態を想定しています。
 
 FastAPI アプリをローカルで起動する最小コマンド:
 
@@ -31,7 +35,14 @@ Dockerfile        # python:3.10-slim ベース
 run.sh            # `docker compose up --build`
 docker-compose.yml
 jetson_watchdog_design.md
-jetson_setup.sh
+jetson_setup_scripts/
+  setup_dev.sh / setup_prod.sh
+  modules/
+    install_host_packages.sh
+    setup_wifi.sh
+    setup_japanese_input.sh
+    setup_docker_env.sh
+    setup_remote_ssh.sh
 ```
 
 ## 今後の追加予定
