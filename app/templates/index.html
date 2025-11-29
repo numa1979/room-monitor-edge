@@ -88,11 +88,20 @@
     <p>{{ app_description }}</p>
 </header>
 <main>
+    {% set settings = camera_settings if camera_settings is defined else {
+        'width': 'N/A',
+        'height': 'N/A',
+        'fps': '-',
+        'quality': '-'
+    } %}
     <section class="card">
         <span class="tag">ライブ映像</span>
         <div class="camera-preview">
             <img id="cameraFeed" src="/camera/stream" alt="Jetson camera preview">
         </div>
+        <p class="camera-config-status">
+            現在: {{ settings.width }}x{{ settings.height }} @ {{ settings.fps }}fps / 品質 {{ settings.quality }}
+        </p>
         <p class="camera-status" id="cameraStatus">
             USBカメラの映像をMJPEG形式で配信しています。
         </p>
@@ -122,7 +131,6 @@
 <script>
     const feed = document.getElementById("cameraFeed");
     const status = document.getElementById("cameraStatus");
-
     if (feed && status) {
         let failureTimer = null;
 
@@ -138,6 +146,7 @@
 
         failureTimer = setTimeout(markError, 5000);
     }
+
 </script>
 </body>
 </html>

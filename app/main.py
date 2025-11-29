@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime
 from pathlib import Path
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Dict
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
@@ -23,7 +23,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir), html=True), name="static")
 
-camera_streamer = CameraStreamer()
+camera_streamer = CameraStreamer(fps=30)
 
 
 async def mjpeg_frame_generator() -> AsyncGenerator[bytes, None]:
@@ -39,6 +39,7 @@ async def mjpeg_frame_generator() -> AsyncGenerator[bytes, None]:
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
     now = datetime.now()
+    camera_settings: Dict[str, object] = camera_streamer.current_settings()
     return templates.TemplateResponse(
         "index.html",
         {
@@ -46,6 +47,7 @@ async def index(request: Request) -> HTMLResponse:
             "app_title": APP_TITLE,
             "app_description": APP_DESCRIPTION,
             "now": now,
+            "camera_settings": camera_settings,
         },
     )
 
@@ -66,6 +68,11 @@ async def camera_stream() -> StreamingResponse:
         mjpeg_frame_generator(),
         media_type="multipart/x-mixed-replace; boundary=frame",
     )
+
+
+@app.get("/camera/settings", response_class=JSONResponse)
+async def camera_settings() -> JSONResponse:
+    return JSONResponse({"current": camera_streamer.current_settings()})
 
 
 @app.on_event("shutdown")
