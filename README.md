@@ -9,7 +9,7 @@ Jetson Nano 上で動かす見守り AI システムの最初のひな形です�
 1. microSD を Jetson に挿し、有線 LAN で起動して Ubuntu 18.04 初期セットアップを完了する  
 2. `room-monitor-edge` をクローンする  
 3. **開発時:** `jetson_setup_scripts/setup_dev.sh` を実行  
-   - Wi-Fi ドライバ + 接続、日本語入力、Ubuntu 22.04 コンテナ起動、VS Code Remote-SSH (2222/tcp) を構築  
+   - Wi-Fi ドライバ + 接続、日本語入力、Ubuntu 22.04 コンテナ起動、VS Code Remote-SSH (2222/tcp) を構築（コンテナのデフォルトユーザはホストユーザ名を引き継ぎ）  
 4. **配布時:** `jetson_setup_scripts/setup_prod.sh` を実行  
    - 依存パッケージと Docker ベースの FastAPI アプリだけを起動（LAN 接続のままで OK）  
 
