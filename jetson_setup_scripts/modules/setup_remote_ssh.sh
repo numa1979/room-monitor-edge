@@ -43,6 +43,16 @@ info "openssh-server と sudo を導入"
 
 info "ユーザ ${CONTAINER_USER}(uid=${HOST_UID}) を準備"
 if ! "${DOCKER[@]}" exec "$CONTAINER_NAME" id -u "$CONTAINER_USER" >/dev/null 2>&1; then
+  # UID が既に他ユーザに使われている場合はそのユーザを流用する
+  if EXISTING_USER=$("${DOCKER[@]}" exec "$CONTAINER_NAME" sh -c "getent passwd ${HOST_UID} | cut -d: -f1"); then
+    if [ -n "$EXISTING_USER" ]; then
+      info "uid=${HOST_UID} は既存ユーザ ${EXISTING_USER} が使用中のため流用します"
+      CONTAINER_USER="$EXISTING_USER"
+    fi
+  fi
+fi
+
+if ! "${DOCKER[@]}" exec "$CONTAINER_NAME" id -u "$CONTAINER_USER" >/dev/null 2>&1; then
   "${DOCKER[@]}" exec "$CONTAINER_NAME" useradd -m -u "$HOST_UID" -s /bin/bash -G sudo "$CONTAINER_USER"
 fi
 
