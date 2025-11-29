@@ -13,6 +13,7 @@ DRIVER_DIR=${DRIVER_DIR:-$HOME/rtl88x2bu}
 IFACE=${IFACE:-wlan0}
 SSID=${SSID:-}
 PASS=${PASS:-}
+CONFIG_FILE=${WIFI_CONFIG:-$REPO_ROOT/wifi_config}
 
 info() { printf '[wifi] %s\n' "$*"; }
 warn() { printf '[wifi warn] %s\n' "$*" >&2; }
@@ -67,6 +68,23 @@ else
   info "既に rtl88x2bu ドライバが導入済みのためスキップ"
   sudo modprobe 88x2bu || true
 fi
+
+load_config() {
+  if [ ! -f "$CONFIG_FILE" ]; then
+    return
+  fi
+  info "Wi-Fi 設定を ${CONFIG_FILE} から読み込みます"
+  while IFS='=' read -r key value; do
+    case "$key" in
+      ''|\#*) continue ;;
+      SSID) : "${SSID:=$value}" ;;
+      PASS) : "${PASS:=$value}" ;;
+      IFACE) : "${IFACE:=$value}" ;;
+    esac
+  done < "$CONFIG_FILE"
+}
+
+load_config
 
 if [ -z "$SSID" ]; then
   read -rp "SSID: " SSID
