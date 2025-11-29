@@ -1,0 +1,7 @@
+services:
+  jetson_watchdog:
+    build: .
+    container_name: jetson_watchdog
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

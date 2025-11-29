@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ app_title }}</title>
+    <style>
+        :root {
+            color-scheme: dark light;
+            font-family: "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: radial-gradient(circle at top, #1f3f5b, #0b1320);
+            color: #f5f7fb;
+        }
+        header {
+            padding: 1.5rem;
+            background: rgba(8, 13, 24, 0.7);
+            backdrop-filter: blur(4px);
+        }
+        main {
+            flex: 1;
+            padding: 2rem clamp(1rem, 4vw, 3rem);
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem;
+        }
+        .card {
+            padding: 1.25rem;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.2);
+        }
+        .status {
+            font-size: clamp(2rem, 6vw, 3rem);
+            margin: 0.25rem 0 0;
+        }
+        footer {
+            text-align: center;
+            padding: 1rem;
+            font-size: 0.85rem;
+            background: rgba(8, 13, 24, 0.7);
+        }
+        .tag {
+            display: inline-block;
+            padding: 0.3rem 0.9rem;
+            border-radius: 999px;
+            background: rgba(0, 255, 181, 0.15);
+            border: 1px solid rgba(0, 255, 181, 0.4);
+            color: #00ffb5;
+            font-size: 0.85rem;
+        }
+        ul {
+            padding-left: 1.2rem;
+        }
+        li {
+            margin-bottom: 0.35rem;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>{{ app_title }}</h1>
+    <p>{{ app_description }}</p>
+</header>
+<main>
+    <section class="card">
+        <span class="tag">接続状態</span>
+        <p class="status">ONLINE</p>
+        <p>Jetsonが応答中です。ここから監視UIを作り込んでいきます。</p>
+    </section>
+    <section class="card">
+        <h2>今後追加するもの</h2>
+        <ul>
+            <li>カメラ映像のライブ表示</li>
+            <li>転倒/徘徊イベントの検知と通知</li>
+            <li>しきい値・監視対象の設定UI</li>
+        </ul>
+    </section>
+    <section class="card">
+        <h2>サーバ情報</h2>
+        <p>表示時刻: {{ now.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+        <p>ヘルスチェック: <code>/health</code></p>
+    </section>
+</main>
+<footer>
+    &copy; {{ now.year }} Jetson Watchdog Prototype
+</footer>
+</body>
+</html>
