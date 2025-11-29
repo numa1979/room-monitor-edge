@@ -16,16 +16,26 @@ info() { printf '\033[1;34m[docker]\033[0m %s\n' "$*"; }
 err() { printf '\033[1;31m[docker ERROR]\033[0m %s\n' "$*" >&2; }
 
 command -v docker >/dev/null 2>&1 || { err "docker コマンドがありません"; exit 1; }
+DOCKER=(docker)
+if ! "${DOCKER[@]}" ps >/dev/null 2>&1; then
+  if sudo docker ps >/dev/null 2>&1; then
+    info "docker へのアクセスに sudo を使用します"
+    DOCKER=(sudo docker)
+  else
+    err "docker デーモンにアクセスできません。ユーザーを docker グループに追加するか sudo 権限を確認してください"
+    exit 1
+  fi
+fi
 
 container_exists() {
-  docker ps -a --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"
+  "${DOCKER[@]}" ps -a --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"
 }
 
 start_container() {
   if ! container_exists; then
     info "Ubuntu 22.04 コンテナ ${CONTAINER_NAME} を生成"
-    docker pull "$IMAGE_NAME"
-    docker create \
+    "${DOCKER[@]}" pull "$IMAGE_NAME"
+    "${DOCKER[@]}" create \
       --name "$CONTAINER_NAME" \
       --hostname "$CONTAINER_NAME" \
       --restart unless-stopped \
@@ -37,14 +47,14 @@ start_container() {
       bash -c "tail -f /dev/null" >/dev/null
   fi
 
-  if ! docker ps --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"; then
+  if ! "${DOCKER[@]}" ps --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"; then
     info "コンテナ ${CONTAINER_NAME} を起動"
-    docker start "$CONTAINER_NAME" >/dev/null
+    "${DOCKER[@]}" start "$CONTAINER_NAME" >/dev/null
   fi
 }
 
 exec_root() {
-  docker exec -u root "$CONTAINER_NAME" bash -lc "$1"
+  "${DOCKER[@]}" exec -u root "$CONTAINER_NAME" bash -lc "$1"
 }
 
 prepare_runtime() {
@@ -58,9 +68,9 @@ prepare_runtime() {
 
 start_app() {
   info "既存アプリを停止"
-  docker exec "$CONTAINER_NAME" bash -lc "pkill -f 'uvicorn app.main:app'" >/dev/null 2>&1 || true
+  "${DOCKER[@]}" exec "$CONTAINER_NAME" bash -lc "pkill -f 'uvicorn app.main:app'" >/dev/null 2>&1 || true
   info "FastAPI を起動"
-  docker exec -d "$CONTAINER_NAME" bash -lc "cd /workspace && source ${VENV_PATH}/bin/activate && ${APP_ENTRY}"
+  "${DOCKER[@]}" exec -d "$CONTAINER_NAME" bash -lc "cd /workspace && source ${VENV_PATH}/bin/activate && ${APP_ENTRY}"
 }
 
 start_container

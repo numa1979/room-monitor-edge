@@ -25,6 +25,15 @@ FastAPI アプリをローカルで起動する最小コマンド:
 
 初回はイメージのビルドが走り、その後 `http://<JetsonのIP>:8080` でアクセスできます。停止は `Ctrl + C` です。バックグラウンドで動かしたい場合は `./run.sh -d` を利用してください。
 
+## Wi-Fi ドライバについて
+
+Realtek rtl88x2bu のスナップショット（上流コミット: `42ec4de8d36c9eac0ac26ae714837efbf1a09c1d`）を `jetson_setup_scripts/vendor/rtl88x2bu.tar.gz` として同梱しています。`setup_wifi.sh` は以下の優先順位でソースを取得します:
+1. `DRIVER_DIR` に既にあるソースをそのまま利用
+2. リポジトリ同梱の `rtl88x2bu.tar.gz` を展開して利用
+3. 見つからない場合だけ GitHub の `DRIVER_REPO` を `DRIVER_COMMIT` でクローン
+
+別バージョンを使いたい場合は `DRIVER_DIR` で手元のパスを指すか、`DRIVER_REPO` / `DRIVER_COMMIT` を上書きしてください。
+
 ## プロジェクト構成
 
 ```

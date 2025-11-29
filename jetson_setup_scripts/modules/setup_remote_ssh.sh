@@ -14,44 +14,54 @@ info() { printf '\033[1;34m[ssh]\033[0m %s\n' "$*"; }
 err() { printf '\033[1;31m[ssh ERROR]\033[0m %s\n' "$*" >&2; }
 
 command -v docker >/dev/null 2>&1 || { err "docker コマンドがありません"; exit 1; }
+DOCKER=(docker)
+if ! "${DOCKER[@]}" ps >/dev/null 2>&1; then
+  if sudo docker ps >/dev/null 2>&1; then
+    info "docker へのアクセスに sudo を使用します"
+    DOCKER=(sudo docker)
+  else
+    err "docker デーモンにアクセスできません。先に docker グループや sudo 権限を確認してください"
+    exit 1
+  fi
+fi
 
-if ! docker ps -a --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"; then
+if ! "${DOCKER[@]}" ps -a --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"; then
   err "コンテナ ${CONTAINER_NAME} が存在しません。先に Wi-Fi/Docker セットアップを実行してください。"
   exit 1
 fi
 
-if ! docker ps --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"; then
+if ! "${DOCKER[@]}" ps --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"; then
   info "コンテナ ${CONTAINER_NAME} を起動"
-  docker start "$CONTAINER_NAME" >/dev/null
+  "${DOCKER[@]}" start "$CONTAINER_NAME" >/dev/null
 fi
 
 info "openssh-server と sudo を導入"
-docker exec "$CONTAINER_NAME" bash -lc "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server sudo locales"
+"${DOCKER[@]}" exec "$CONTAINER_NAME" bash -lc "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server sudo locales"
 
-docker exec "$CONTAINER_NAME" bash -lc "mkdir -p /var/run/sshd && sed -i 's/^#\\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config"
-docker exec "$CONTAINER_NAME" bash -lc "sed -i 's/^#\\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config"
+"${DOCKER[@]}" exec "$CONTAINER_NAME" bash -lc "mkdir -p /var/run/sshd && sed -i 's/^#\\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config"
+"${DOCKER[@]}" exec "$CONTAINER_NAME" bash -lc "sed -i 's/^#\\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config"
 
 info "ユーザ ${CONTAINER_USER}(uid=${HOST_UID}) を準備"
-if ! docker exec "$CONTAINER_NAME" id -u "$CONTAINER_USER" >/dev/null 2>&1; then
-  docker exec "$CONTAINER_NAME" useradd -m -u "$HOST_UID" -s /bin/bash -G sudo "$CONTAINER_USER"
+if ! "${DOCKER[@]}" exec "$CONTAINER_NAME" id -u "$CONTAINER_USER" >/dev/null 2>&1; then
+  "${DOCKER[@]}" exec "$CONTAINER_NAME" useradd -m -u "$HOST_UID" -s /bin/bash -G sudo "$CONTAINER_USER"
 fi
 
 if [ -z "$CONTAINER_PASS" ]; then
   read -rsp "${CONTAINER_USER} のパスワード: " CONTAINER_PASS
   echo
 fi
-echo "${CONTAINER_USER}:${CONTAINER_PASS}" | docker exec -i "$CONTAINER_NAME" chpasswd
+echo "${CONTAINER_USER}:${CONTAINER_PASS}" | "${DOCKER[@]}" exec -i "$CONTAINER_NAME" chpasswd
 
 SSH_DIR="/home/${CONTAINER_USER}/.ssh"
-docker exec "$CONTAINER_NAME" bash -lc "mkdir -p ${SSH_DIR} && chmod 700 ${SSH_DIR} && chown -R ${CONTAINER_USER}:${CONTAINER_USER} ${SSH_DIR}"
+"${DOCKER[@]}" exec "$CONTAINER_NAME" bash -lc "mkdir -p ${SSH_DIR} && chmod 700 ${SSH_DIR} && chown -R ${CONTAINER_USER}:${CONTAINER_USER} ${SSH_DIR}"
 if [ -f "${HOST_HOME}/.ssh/id_ed25519.pub" ]; then
   info "ホスト鍵を authorized_keys に追加"
-  docker exec "$CONTAINER_NAME" bash -lc "touch ${SSH_DIR}/authorized_keys && chmod 600 ${SSH_DIR}/authorized_keys"
-  docker exec "$CONTAINER_NAME" bash -lc "cat '${HOST_HOME}/.ssh/id_ed25519.pub' >> ${SSH_DIR}/authorized_keys"
-  docker exec "$CONTAINER_NAME" bash -lc "chown ${CONTAINER_USER}:${CONTAINER_USER} ${SSH_DIR}/authorized_keys"
+  "${DOCKER[@]}" exec "$CONTAINER_NAME" bash -lc "touch ${SSH_DIR}/authorized_keys && chmod 600 ${SSH_DIR}/authorized_keys"
+  "${DOCKER[@]}" exec "$CONTAINER_NAME" bash -lc "cat '${HOST_HOME}/.ssh/id_ed25519.pub' >> ${SSH_DIR}/authorized_keys"
+  "${DOCKER[@]}" exec "$CONTAINER_NAME" bash -lc "chown ${CONTAINER_USER}:${CONTAINER_USER} ${SSH_DIR}/authorized_keys"
 else
   info "${HOST_HOME}/.ssh/id_ed25519.pub が無いため鍵コピーをスキップ"
 fi
 
-docker exec "$CONTAINER_NAME" service ssh restart >/dev/null
+"${DOCKER[@]}" exec "$CONTAINER_NAME" service ssh restart >/dev/null
 info "完了: VS Code から ssh ${CONTAINER_USER}@<Jetson IP> -p ${SSH_PORT} で接続可能"
