@@ -46,8 +46,13 @@ if ! "${DOCKER[@]}" exec "$CONTAINER_NAME" id -u "$CONTAINER_USER" >/dev/null 2>
   # UID が既に他ユーザに使われている場合はそのユーザを流用する
   if EXISTING_USER=$("${DOCKER[@]}" exec "$CONTAINER_NAME" sh -c "getent passwd ${HOST_UID} | cut -d: -f1"); then
     if [ -n "$EXISTING_USER" ]; then
-      info "uid=${HOST_UID} は既存ユーザ ${EXISTING_USER} が使用中のため流用します"
-      CONTAINER_USER="$EXISTING_USER"
+      if [ "$EXISTING_USER" != "$CONTAINER_USER" ]; then
+        info "uid=${HOST_UID} は既存ユーザ ${EXISTING_USER} が使用中のため ${CONTAINER_USER} にリネームします"
+        "${DOCKER[@]}" exec "$CONTAINER_NAME" usermod -l "$CONTAINER_USER" "$EXISTING_USER"
+        "${DOCKER[@]}" exec "$CONTAINER_NAME" usermod -d "/home/${CONTAINER_USER}" -m "$CONTAINER_USER"
+      else
+        info "uid=${HOST_UID} は既存ユーザ ${EXISTING_USER} が使用中のため流用します"
+      fi
     fi
   fi
 fi
