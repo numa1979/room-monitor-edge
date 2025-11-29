@@ -114,10 +114,14 @@
     <section class="card">
         <span class="tag">推論結果プレビュー</span>
         <div class="camera-preview">
-            <img id="inferenceFeed" src="/camera/stream" alt="Inference preview">
+            <img id="inferenceFeed" src="/camera/inference" alt="Inference preview">
         </div>
         <p class="camera-status">
-            将来的にはバウンディングボックスや姿勢推定のオーバーレイ結果をここに表示します。現在はライブ映像と同じストリームを参照しています。
+            {% if yolo_error %}
+                推論エンジンに問題が発生しました: {{ yolo_error }}
+            {% else %}
+                YOLOv8 の推論結果（バウンディングボックス/姿勢オーバーレイ）を表示しています。
+            {% endif %}
         </p>
     </section>
     <section class="card">

@@ -22,7 +22,7 @@ if [[ "$OFFLINE_INSTALL" == "1" ]]; then
     PIP_WHEEL_DIR="$DEFAULT_WHEEL_DIR"
   fi
 fi
-APP_ENTRY="uvicorn app.main:app --host 0.0.0.0 --port ${CONTAINER_PORT}"
+APP_ENTRY="TORCH_LOAD_WEIGHTS_ONLY=0 uvicorn app.main:app --host 0.0.0.0 --port ${CONTAINER_PORT}"
 
 info() { printf '\033[1;34m[docker]\033[0m %s\n' "$*"; }
 err() { printf '\033[1;31m[docker ERROR]\033[0m %s\n' "$*" >&2; }
@@ -127,6 +127,10 @@ start_app() {
   info "既存アプリを停止"
   "${DOCKER[@]}" exec "$CONTAINER_NAME" bash -lc "pkill -f 'uvicorn app.main:app'" >/dev/null 2>&1 || true
   info "FastAPI を起動"
+  info "YOLOv8 モデルを確認/ダウンロード"
+  if ! "${DOCKER[@]}" exec "$CONTAINER_NAME" bash -lc "cd /workspace && source ${VENV_PATH}/bin/activate && python scripts/download_yolo_weights.py"; then
+    info "YOLO ダウンロードに失敗しました。あとで手動実行してください"
+  fi
   "${DOCKER[@]}" exec -d "$CONTAINER_NAME" bash -lc "cd /workspace && source ${VENV_PATH}/bin/activate && ${APP_ENTRY}"
 }
 

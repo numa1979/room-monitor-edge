@@ -39,15 +39,10 @@ ssh -p 2222 <Jetsonのホストユーザー>@<JetsonのIP>
 - コンテナ内で `ls /dev/video*` を実行してパスが見えること、`v4l2-ctl --list-formats-ext` などで MJPEG が有効なことを確認。  
 - それでも映らない場合は `docker logs jetson-watchdog-ubuntu2204` で FastAPI のログを確認。`CameraStreamer` が `/dev/video0` を開けていない場合はホスト側で使用中のアプリがないかを見直す。
 
-### YOLOv8 モデルの取得 (必要になったときのみ)
-- FastAPI アプリや依存ライブラリのインストールは `./jetson_setup_scripts/setup_dev.sh` だけで完了する。追加のコマンドは不要。
-- **推論で YOLOv8 の学習済み重みが必要になったときだけ**、Jetson コンテナ内で以下を実行してダウンロードする。  
-  ```bash
-  source /opt/jetson_watchdog_venv/bin/activate
-  python scripts/download_yolo_weights.py
-  ```
-- 上記スクリプトは Ultralytics の公式 CDN から `yolov8n.pt` (人検出) と `yolov8n-pose.pt` (Pose) を取得し、`~/.config/Ultralytics/weights/` に保存する。別モデルを使いたい場合は `scripts/download_yolo_weights.py` の `DEFAULT_MODELS` を編集するか、`yolo download model=<name>.pt` を直接実行する。  
-- オフライン環境で推論したい場合は、オンライン時にこのスクリプトを実行して `.pt` ファイルをコピーしておく。
+### YOLOv8 モデル自動取得
+- `./jetson_setup_scripts/setup_dev.sh` / `setup_prod.sh` 実行時に `scripts/download_yolo_weights.py` を呼び、`yolov8n.pt` と `yolov8n-pose.pt` を `~/.config/Ultralytics/weights/` へダウンロードする。すでにファイルが存在すればスキップ。
+- オフライン環境で再セットアップする場合は、オンライン時に一度実行しておいた `.pt` ファイルを Jetson に残しておくかコピーする。  
+- 自動ダウンロードをスキップしたい場合は、セットアップ実行時に `DOWNLOAD_YOLO_WEIGHTS=0 ./jetson_setup_scripts/setup_dev.sh` のように環境変数で制御できる。
 
 ### オフライン環境向けセットアップ
 - 初回は Jetson をインターネットに接続し、`./jetson_setup_scripts/setup_dev.sh` を通常どおり実行して必要な APT/PIP 依存を導入する。  

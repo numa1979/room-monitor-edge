@@ -5,6 +5,7 @@ import time
 from typing import Dict, Optional
 
 import cv2
+import numpy as np
 
 
 class CameraStreamer:
@@ -30,6 +31,7 @@ class CameraStreamer:
 
         self._frame_lock = threading.Lock()
         self._frame: Optional[bytes] = None
+        self._frame_bgr: Optional[np.ndarray] = None
         self._running = True
 
         self._thread = threading.Thread(target=self._update_loop, daemon=True)
@@ -61,12 +63,19 @@ class CameraStreamer:
 
             with self._frame_lock:
                 self._frame = buffer.tobytes()
+                self._frame_bgr = frame.copy()
 
             time.sleep(1 / max(self.fps, 1))
 
     def latest_frame(self) -> Optional[bytes]:
         with self._frame_lock:
             return self._frame
+
+    def latest_frame_array(self) -> Optional[np.ndarray]:
+        with self._frame_lock:
+            if self._frame_bgr is None:
+                return None
+            return self._frame_bgr.copy()
 
     def current_settings(self) -> Dict[str, int]:
         with self._capture_lock:
