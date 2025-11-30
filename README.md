@@ -64,7 +64,7 @@ ssh -p 2222 <Jetsonのホストユーザー>@<JetsonのIP>
 （Windows/WLS/mac いずれもほぼ同じ設定です）
 ```
 Host jetson-nano
-    HostName 192.168.10.118
+    HostName jetson.local   # デフォルトでホスト名=jetson に設定される
     Port 2222
     User <Jetsonで作ったホストユーザー>
     PubkeyAuthentication no
@@ -73,7 +73,7 @@ Host jetson-nano
 ```
 - Windows でホスト鍵を保存しない場合は `UserKnownHostsFile NUL` を追加。  
 - 接続すると 22.04 コンテナ内で `/workspace` がリポジトリルート。
-- ホスト (18.04) 側は mDNS を有効化しているため、同じネットでは `jetson.local` などホスト名で到達可能。
+- ホスト (18.04) 側は mDNS を有効化しているため、同じネットでは `jetson.local` で到達可能（環境変数 `HOSTNAME_OVERRIDE` で変更可）。
 
 ## 本番環境 (18.04 ホスト上)
 Jetson 上で以下を実行:
