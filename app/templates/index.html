@@ -1,182 +1,381 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ app_title }}</title>
     <style>
-        :root {
-            color-scheme: dark light;
-            font-family: "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+      :root {
+        color-scheme: dark light;
+        font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: radial-gradient(circle at top, #1f3f5b, #0b1320);
+        color: #f5f7fb;
+        width: 100%;
+        overflow-x: hidden;
+      }
+
+      header {
+        padding: 1.5rem;
+        background: rgba(8, 13, 24, 0.7);
+        backdrop-filter: blur(4px);
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      .header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+
+      .status-pill {
+        padding: 0.35rem 1rem;
+        border-radius: 999px;
+        background: rgba(0, 255, 181, 0.15);
+        border: 1px solid rgba(0, 255, 181, 0.4);
+        color: #00ffb5;
+        font-size: 0.9rem;
+        letter-spacing: 0.05em;
+      }
+
+      .status-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        font-size: 0.9rem;
+        color: rgba(255, 255, 255, 0.8);
+      }
+
+      .status-meta span {
+        white-space: nowrap;
+      }
+
+      #serverTime {
+        font-variant-numeric: tabular-nums;
+        font-family: 'Roboto Mono', 'SFMono-Regular', 'Courier New', monospace;
+        display: inline-block;
+        min-width: 19ch;
+        text-align: right;
+      }
+
+      main {
+        flex: 1;
+        padding: 2rem clamp(1rem, 4vw, 3rem);
+        width: min(960px, 100%);
+        margin: 0 auto;
+      }
+
+      .content-grid {
+        display: grid;
+        gap: 1.5rem;
+        grid-template-columns: 1fr;
+      }
+
+      .card {
+        padding: 1.4rem;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        box-shadow: 0 25px 45px rgba(0, 0, 0, 0.2);
+      }
+
+      .preview-card {
+        grid-column: 1 / -1;
+      }
+
+      @media (min-width: 900px) {
+        .content-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
-        body {
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            background: radial-gradient(circle at top, #1f3f5b, #0b1320);
-            color: #f5f7fb;
+        .preview-card {
+          grid-column: 1 / -1;
         }
-        header {
-            padding: 1.5rem;
-            background: rgba(8, 13, 24, 0.7);
-            backdrop-filter: blur(4px);
-        }
-        main {
-            flex: 1;
-            padding: 2rem clamp(1rem, 4vw, 3rem);
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 1.5rem;
-        }
-        .card {
-            padding: 1.25rem;
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 18px;
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.2);
-        }
-        .status {
-            font-size: clamp(2rem, 6vw, 3rem);
-            margin: 0.25rem 0 0;
-        }
-        footer {
-            text-align: center;
-            padding: 1rem;
-            font-size: 0.85rem;
-            background: rgba(8, 13, 24, 0.7);
-        }
-        .tag {
-            display: inline-block;
-            padding: 0.3rem 0.9rem;
-            border-radius: 999px;
-            background: rgba(0, 255, 181, 0.15);
-            border: 1px solid rgba(0, 255, 181, 0.4);
-            color: #00ffb5;
-            font-size: 0.85rem;
-        }
-        ul {
-            padding-left: 1.2rem;
-        }
-        li {
-            margin-bottom: 0.35rem;
-        }
-        .camera-preview {
-            margin-top: 0.75rem;
-            border-radius: 12px;
-            overflow: hidden;
-            background: #05070f;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .camera-preview img {
-            display: block;
-            width: 100%;
-            height: auto;
-            background: #05070f;
-        }
-        .camera-status {
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
-            color: rgba(255, 255, 255, 0.8);
-        }
+      }
+
+      .camera-preview {
+        margin-top: 0.75rem;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #05070f;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .camera-preview img {
+        display: block;
+        width: 100%;
+        height: auto;
+        background: #05070f;
+      }
+
+      .camera-status {
+        margin-top: 0.6rem;
+        font-size: 0.95rem;
+        color: rgba(255, 255, 255, 0.8);
+      }
+
+      .room-card form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+        margin-top: 0.8rem;
+      }
+
+      label {
+        font-size: 0.9rem;
+        color: rgba(255, 255, 255, 0.8);
+      }
+
+      input[type='text'] {
+        padding: 0.6rem 0.75rem;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: rgba(0, 0, 0, 0.2);
+        color: #f5f7fb;
+        font-size: 1rem;
+      }
+
+      button {
+        padding: 0.65rem 1.2rem;
+        border-radius: 999px;
+        border: none;
+        background: linear-gradient(135deg, #00ffa3, #00c6ff);
+        color: #05070f;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .room-feedback {
+        font-size: 0.85rem;
+        min-height: 1.1rem;
+        color: rgba(255, 255, 255, 0.75);
+      }
+
+      footer {
+        text-align: center;
+        padding: 1rem;
+        font-size: 0.85rem;
+        background: rgba(8, 13, 24, 0.7);
+      }
     </style>
-</head>
-<body>
-<header>
-    <h1>{{ app_title }}</h1>
-    <p>{{ app_description }}</p>
-</header>
-<main>
-    {% set settings = camera_settings if camera_settings is defined else {
-        'width': 'N/A',
-        'height': 'N/A',
-        'fps': '-',
-        'quality': '-'
-    } %}
-    <section class="card">
-        <span class="tag">接続状態</span>
-        <p class="status">ONLINE</p>
-        <p>Jetsonが応答中です。{{ settings.width }}x{{ settings.height }} / {{ settings.fps }}fps で配信中です。</p>
-    </section>
-    <section class="card">
-        <span class="tag">推論結果プレビュー</span>
-        <div class="camera-preview">
-            <img id="inferenceFeed" src="/camera/inference" alt="Inference preview" style="cursor: pointer;">
+  </head>
+
+  <body>
+    <header>
+      <div class="header-row">
+        <div>
+          <h1>{{ app_title }}</h1>
+          <p>{{ app_description }}</p>
         </div>
-        <p class="camera-status">
-            {% if yolo_error %}
-                推論エンジンに問題が発生しました: {{ yolo_error }}
-            {% else %}
-                YOLOv8 の推論結果（バウンディングボックス/姿勢オーバーレイ）を表示しています。
-            {% endif %}
-        </p>
-        <p class="camera-status" id="targetStatus">
-            監視対象: なし（推論プレビューをタップして選択）
-        </p>
-    </section>
-    <section class="card">
-        <h2>サーバ情報</h2>
-        <p>表示時刻: {{ now.strftime('%Y-%m-%d %H:%M:%S') }}</p>
-        <p>ヘルスチェック: <code>/health</code></p>
-    </section>
-</main>
-<footer>
-    &copy; {{ now.year }} Jetson Watchdog Prototype
-</footer>
-<script>
-    const inferenceFeed = document.getElementById("inferenceFeed");
-    const targetStatus = document.getElementById("targetStatus");
-    const formatTargets = (selected) => {
+        <div class="status-pill" id="systemStatusText">
+          {% if yolo_error %} 推論エンジンに問題が発生しました {% else %} ONLINE {% endif %}
+        </div>
+      </div>
+      <div class="status-meta">
+        <span>サーバ時刻: <span id="serverTime">{{ now.strftime('%Y-%m-%d %H:%M:%S') }}</span></span>
+      </div>
+    </header>
+    <main>
+      <section class="content-grid">
+        <article class="card preview-card">
+          <h2>推論プレビュー</h2>
+          <div class="camera-preview">
+            <img id="inferenceFeed" src="/camera/inference" alt="Inference preview" style="cursor: pointer" />
+          </div>
+          <p class="camera-status">
+            {% if yolo_error %} 推論エンジンに問題が発生しました: {{ yolo_error }} {% else %}
+            画面をタップして見守り対象を登録できます。 {% endif %}
+          </p>
+          <p class="camera-status" id="targetStatus">見守り対象: なし（プレビューをタップして登録）</p>
+        </article>
+
+        <article class="card room-card">
+          <h2>部屋設定</h2>
+          <p>現在の部屋: <strong id="roomCurrent">{{ room_settings.get('name') or '未設定' }}</strong></p>
+          <form id="roomForm">
+            <label for="roomName">部屋名 / 部屋ID</label>
+            <input
+              type="text"
+              id="roomName"
+              name="roomName"
+              placeholder="例: 西棟-302"
+              value="{{ room_settings.get('name') or '' }}"
+              autocomplete="off"
+            />
+            <button type="submit">保存</button>
+          </form>
+          <p class="room-feedback" id="roomFeedback"></p>
+        </article>
+
+        <article class="card info-card">
+          <h2>運用メモ</h2>
+          <p>推論プレビューをタップすると患者を登録できます。枠は最大4名、自動で削除されません。</p>
+          <p>登録済みの患者を解除するときは、対応するバウンディングボックスをもう一度タップしてください。</p>
+        </article>
+      </section>
+    </main>
+    <footer>&copy; {{ now.year }} Jetson Watchdog Prototype</footer>
+    <script>
+      const inferenceFeed = document.getElementById('inferenceFeed');
+      const targetStatus = document.getElementById('targetStatus');
+      const serverTimeEl = document.getElementById('serverTime');
+      const roomForm = document.getElementById('roomForm');
+      const roomInput = document.getElementById('roomName');
+      const roomCurrent = document.getElementById('roomCurrent');
+      const roomFeedback = document.getElementById('roomFeedback');
+
+      const formatTargets = (selected) => {
         if (!targetStatus) return;
-        const slots = Array.isArray(selected) ? selected.map((s) => s.slot).filter(Boolean) : [];
-        if (slots.length === 0) {
-            targetStatus.textContent = "監視対象: なし（推論プレビューをタップして選択）";
-        } else {
-            targetStatus.textContent = `監視対象: ${slots.join(", ")}`;
+        if (!Array.isArray(selected) || selected.length === 0) {
+          targetStatus.textContent = '見守り対象: なし（プレビューをタップして登録）';
+          return;
         }
-    };
+        const activeSlots = selected
+          .filter((s) => s.active)
+          .map((s) => s.slot)
+          .filter(Boolean);
+        const inactiveSlots = selected
+          .filter((s) => !s.active)
+          .map((s) => s.slot)
+          .filter(Boolean);
+        if (activeSlots.length === 0) {
+          if (inactiveSlots.length === 0) {
+            targetStatus.textContent = '見守り対象: なし（プレビューをタップして登録）';
+          } else {
+            targetStatus.textContent = `見守り対象: なし（離脱: ${inactiveSlots.join(', ')})`;
+          }
+          return;
+        }
+        let text = `見守り対象: ${activeSlots.join(', ')}`;
+        if (inactiveSlots.length > 0) {
+          text += ` / 離脱: ${inactiveSlots.join(', ')}`;
+        }
+        targetStatus.textContent = text;
+      };
 
-    const refreshTargets = async () => {
+      const refreshTargets = async () => {
         try {
-            const res = await fetch("/targets");
-            if (!res.ok) return;
-            const data = await res.json();
-            formatTargets(data.selected);
+          const res = await fetch('/targets');
+          if (!res.ok) return;
+          const data = await res.json();
+          formatTargets(data.selected);
         } catch (error) {
-            // ignore
+          // ignore
         }
-    };
+      };
 
-    if (inferenceFeed) {
-        inferenceFeed.addEventListener("click", async (event) => {
-            const rect = inferenceFeed.getBoundingClientRect();
-            const x = (event.clientX - rect.left) / rect.width;
-            const y = (event.clientY - rect.top) / rect.height;
-            try {
-                const res = await fetch("/targets/select", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ x, y })
-                });
-                const data = await res.json();
-                if (data.status === "full" && targetStatus) {
-                    targetStatus.textContent = "監視対象は最大4人までです。対象を解除してから追加してください。";
-                } else if (data.status === "not_found" && targetStatus) {
-                    targetStatus.textContent = "クリック位置で検出対象を特定できませんでした。もう一度お試しください。";
-                } else {
-                    formatTargets(data.selected);
-                }
-            } catch (error) {
-                if (targetStatus) {
-                    targetStatus.textContent = "監視対象の更新に失敗しました。";
-                }
+      if (inferenceFeed) {
+        inferenceFeed.addEventListener('click', async (event) => {
+          const rect = inferenceFeed.getBoundingClientRect();
+          const x = (event.clientX - rect.left) / rect.width;
+          const y = (event.clientY - rect.top) / rect.height;
+          try {
+            const res = await fetch('/targets/select', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ x, y }),
+            });
+            const data = await res.json();
+            if (data.status === 'full' && targetStatus) {
+              targetStatus.textContent = '監視対象は最大4人までです。対象を解除してから追加してください。';
+            } else if (data.status === 'not_found' && targetStatus) {
+              targetStatus.textContent = 'クリック位置で検出対象を特定できませんでした。もう一度お試しください。';
+            } else {
+              formatTargets(data.selected);
             }
+          } catch (error) {
+            if (targetStatus) {
+              targetStatus.textContent = '見守り対象の更新に失敗しました。';
+            }
+          }
         });
-    }
+      }
 
-    refreshTargets();
-    setInterval(refreshTargets, 5000);
-</script>
-</body>
+      refreshTargets();
+      setInterval(refreshTargets, 5000);
+
+      const refreshRoom = async () => {
+        try {
+          const res = await fetch('/room');
+          if (!res.ok) return;
+          const data = await res.json();
+          const roomName = (data && data.room && data.room.name) || '';
+          if (roomCurrent) roomCurrent.textContent = roomName || '未設定';
+          if (roomInput && document.activeElement !== roomInput) {
+            roomInput.value = roomName;
+          }
+        } catch (error) {
+          // ignore
+        }
+      };
+
+      if (roomForm) {
+        roomForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const name = roomInput ? roomInput.value.trim() : '';
+          try {
+            const res = await fetch('/room', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+              if (roomCurrent) {
+                roomCurrent.textContent = (data && data.room && data.room.name) || '未設定';
+              }
+              if (roomFeedback) roomFeedback.textContent = '保存しました';
+            } else if (roomFeedback) {
+              roomFeedback.textContent = (data && data.detail) || '保存に失敗しました';
+            }
+          } catch (error) {
+            if (roomFeedback) roomFeedback.textContent = '保存に失敗しました';
+          }
+          setTimeout(() => {
+            if (roomFeedback) roomFeedback.textContent = '';
+          }, 4000);
+        });
+      }
+
+      const pad = (num) => String(num).padStart(2, '0');
+      const formatDateTime = (date) => {
+        const year = date.getFullYear();
+        const month = pad(date.getMonth() + 1);
+        const day = pad(date.getDate());
+        const hours = pad(date.getHours());
+        const minutes = pad(date.getMinutes());
+        const seconds = pad(date.getSeconds());
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+      };
+
+      const updateServerTime = () => {
+        if (!serverTimeEl) return;
+        serverTimeEl.textContent = formatDateTime(new Date());
+      };
+
+      updateServerTime();
+      setInterval(updateServerTime, 1000);
+
+      refreshRoom();
+      setInterval(refreshRoom, 15000);
+    </script>
+  </body>
 </html>

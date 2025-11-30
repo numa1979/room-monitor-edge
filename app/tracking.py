@@ -23,6 +23,22 @@ def _compute_iou(box_a: np.ndarray, box_b: np.ndarray) -> float:
     return inter_area / float(area_a + area_b - inter_area + 1e-6)
 
 
+def _center_distance_ratio(box_a: np.ndarray, box_b: np.ndarray) -> float:
+    ax1, ay1, ax2, ay2 = box_a
+    bx1, by1, bx2, by2 = box_b
+    acx = (ax1 + ax2) * 0.5
+    acy = (ay1 + ay2) * 0.5
+    bcx = (bx1 + bx2) * 0.5
+    bcy = (by1 + by2) * 0.5
+    aw = max(1.0, ax2 - ax1)
+    ah = max(1.0, ay2 - ay1)
+    bw = max(1.0, bx2 - bx1)
+    bh = max(1.0, by2 - by1)
+    diag_ref = max(np.hypot(aw, ah), np.hypot(bw, bh), 1.0)
+    dist = np.hypot(acx - bcx, acy - bcy)
+    return dist / diag_ref
+
+
 @dataclass
 class TrackState:
     bbox: np.ndarray
@@ -32,9 +48,15 @@ class TrackState:
 
 
 class CentroidTracker:
-    def __init__(self, max_lost: int = 15, match_iou: float = 0.3) -> None:
+    def __init__(
+        self,
+        max_lost: int = 45,
+        match_iou: float = 0.2,
+        match_center_ratio: float = 0.35,
+    ) -> None:
         self.max_lost = max_lost
         self.match_iou = match_iou
+        self.match_center_ratio = match_center_ratio
         self._next_id = 1
         self._tracks: Dict[int, TrackState] = {}
 
@@ -58,31 +80,46 @@ class CentroidTracker:
             return tracked
 
         unmatched_tracks = set(self._tracks.keys())
-        unmatched_dets = list(range(len(detections)))
+        det_indices = list(range(len(detections)))
         matches: List[Tuple[int, int]] = []
+        matched_dets: set[int] = set()
 
         if detections:
-            iou_matrix = np.zeros((len(self._tracks), len(detections)), dtype=float)
             track_ids = list(self._tracks.keys())
+            score_matrix = np.full(
+                (len(track_ids), len(det_indices)), -1.0, dtype=float
+            )
             for t_idx, tid in enumerate(track_ids):
-                for d_idx, det_idx in enumerate(unmatched_dets):
-                    iou_matrix[t_idx, d_idx] = _compute_iou(
-                        self._tracks[tid].bbox, detections[det_idx]["bbox"]
-                    )
+                track_bbox = self._tracks[tid].bbox
+                for d_idx, det_idx in enumerate(det_indices):
+                    det_bbox = detections[det_idx]["bbox"]
+                    iou = _compute_iou(track_bbox, det_bbox)
+                    score = -1.0
+                    if iou >= self.match_iou:
+                        score = iou
+                    elif self.match_center_ratio is not None:
+                        ratio = _center_distance_ratio(track_bbox, det_bbox)
+                        if ratio <= self.match_center_ratio:
+                            score = max(score, 1.0 - ratio)
+                    if score >= 0:
+                        score_matrix[t_idx, d_idx] = score
 
-            while True:
-                max_idx = np.unravel_index(np.argmax(iou_matrix), iou_matrix.shape)
-                max_value = iou_matrix[max_idx]
-                if max_value < self.match_iou:
+            while score_matrix.size > 0:
+                max_idx = np.unravel_index(np.argmax(score_matrix), score_matrix.shape)
+                max_value = score_matrix[max_idx]
+                if max_value < 0:
                     break
                 t_idx, d_idx = max_idx
-                tid = list(self._tracks.keys())[t_idx]
-                det_idx = unmatched_dets[d_idx]
+                tid = track_ids[t_idx]
+                det_idx = det_indices[d_idx]
+                if det_idx in matched_dets:
+                    score_matrix[:, d_idx] = -1
+                    continue
                 matches.append((tid, det_idx))
                 unmatched_tracks.discard(tid)
-                unmatched_dets.remove(det_idx)
-                iou_matrix[t_idx, :] = -1
-                iou_matrix[:, d_idx] = -1
+                matched_dets.add(det_idx)
+                score_matrix[t_idx, :] = -1
+                score_matrix[:, d_idx] = -1
 
         for tid, det_idx in matches:
             det = detections[det_idx]
@@ -91,7 +128,8 @@ class CentroidTracker:
             self._tracks[tid].conf = det["conf"]
             self._tracks[tid].lost = 0
 
-        for det_idx in unmatched_dets:
+        remaining_dets = [idx for idx in det_indices if idx not in matched_dets]
+        for det_idx in remaining_dets:
             self._register(detections[det_idx])
 
         for tid in list(unmatched_tracks):

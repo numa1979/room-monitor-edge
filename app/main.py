@@ -48,8 +48,8 @@ _allowlist_serialization_classes()
 from .camera import CameraStreamer
 from .tracking import CentroidTracker
 
-APP_TITLE = "Jetson Watchdog"
-APP_DESCRIPTION = "Prototype UI for the Jetson room-monitor project."
+APP_TITLE = "見守り君 ver.1.0.0 Prototype"
+APP_DESCRIPTION = "Jetson room-monitor prototype UI."
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -78,6 +78,7 @@ except Exception as exc:  # pragma: no cover
 tracker = CentroidTracker()
 detections_lock = threading.Lock()
 targets_lock = threading.Lock()
+room_lock = threading.Lock()
 latest_detections: Dict[str, object] = {
     "width": 0,
     "height": 0,
@@ -90,9 +91,15 @@ MAX_DETECTIONS = int(os.getenv("MAX_DETECTIONS", "6"))
 yolo_person_only = os.getenv("YOLO_PERSON_ONLY", "1") == "1"
 yolo_class_names: Dict[int, str] = {}
 allowed_class_ids = {0} if yolo_person_only else None
-SLOT_KEEP_SECONDS = int(os.getenv("SLOT_KEEP_SECONDS", "600"))
+YOLO_MIN_CONF = float(os.getenv("YOLO_MIN_CONF", "0.5"))
 SLOT_RECALL_IOU = float(os.getenv("SLOT_RECALL_IOU", "0.3"))
+SLOT_RECALL_CENTER = float(os.getenv("SLOT_RECALL_CENTER", "0.35"))
+SLOT_RECALL_DESCRIPTOR = float(os.getenv("SLOT_RECALL_DESCRIPTOR", "0.6"))
 slot_memory: Dict[int, Dict[str, object]] = {}
+room_settings: Dict[str, object] = {
+    "name": os.getenv("DEFAULT_ROOM_NAME", ""),
+    "updated_at": time.time(),
+}
 if yolo_model is not None:
     try:
         yolo_class_names = yolo_model.model.names  # type: ignore[attr-defined]
@@ -105,6 +112,10 @@ class SelectionRequest(BaseModel):
     y: float
 
 
+class RoomSettingsRequest(BaseModel):
+    name: str
+
+
 def _detections_snapshot() -> Dict[str, object]:
     with detections_lock:
         return {
@@ -115,26 +126,44 @@ def _detections_snapshot() -> Dict[str, object]:
         }
 
 
-def _selected_snapshot() -> List[Dict[str, int]]:
+def _selected_snapshot() -> List[Dict[str, object]]:
     with targets_lock:
-        return [
-            {"track_id": tid, "slot": slot} for tid, slot in selected_tracks.items()
-        ]
+        snapshot: List[Dict[str, object]] = []
+        for slot in sorted(slot_memory.keys()):
+            info = slot_memory[slot]
+            track_id = info.get("track_id")
+            snapshot.append(
+                {
+                    "track_id": track_id,
+                    "slot": slot,
+                    "active": track_id in selected_tracks,
+                    "last_seen": info.get("last_seen", 0.0),
+                }
+            )
+        return snapshot
 
 
 def _prune_selected(active_track_ids: List[int]) -> None:
     active_set = set(active_track_ids)
-    removed_slots: List[int] = []
+    inactivated_slots: List[int] = []
     with targets_lock:
-        for tid in list(selected_tracks.keys()):
+        for tid, slot in list(selected_tracks.items()):
             if tid not in active_set:
-                removed_slots.append(selected_tracks.pop(tid))
-    if removed_slots:
-        logger.info("Pruned inactive targets, freed slots %s", removed_slots)
+                selected_tracks.pop(tid)
+                info = slot_memory.get(slot)
+                if info is not None:
+                    info["track_id"] = None
+                    info.setdefault("last_seen", time.time())
+                inactivated_slots.append(slot)
+    if inactivated_slots:
+        logger.info("Tracks lost for slots %s", inactivated_slots)
 
 
 def _next_available_slot() -> Optional[int]:
-    used = set(selected_tracks.values())
+    for slot, info in sorted(slot_memory.items()):
+        if info.get("track_id") is None:
+            return slot
+    used = set(slot_memory.keys())
     for slot in range(1, MAX_TARGETS + 1):
         if slot not in used:
             return slot
@@ -165,13 +194,16 @@ def _toggle_track(track_id: int) -> Dict[str, Optional[int]]:
             slot_memory.pop(slot, None)
             logger.info("Deselected track %s (slot %s)", track_id, slot)
             return {"status": "removed", "slot": slot}
-        if len(selected_tracks) >= MAX_TARGETS:
-            return {"status": "full", "slot": None}
         slot = _next_available_slot()
         if slot is None:
             return {"status": "full", "slot": None}
         selected_tracks[track_id] = slot
-        slot_memory.setdefault(slot, {"bbox": None, "timestamp": 0.0})
+        slot_memory[slot] = {
+            "track_id": track_id,
+            "bbox": None,
+            "descriptor": None,
+            "last_seen": time.time(),
+        }
         logger.info("Selected track %s as slot %s", track_id, slot)
         return {"status": "added", "slot": slot}
 
@@ -193,48 +225,103 @@ def _bbox_iou(a: List[float], b: List[float]) -> float:
     return inter / (area_a + area_b - inter + 1e-6)
 
 
-def _expire_slot_memory() -> None:
-    now = time.time()
-    for slot in list(slot_memory.keys()):
-        if slot in selected_tracks.values():
-            continue
-        if now - slot_memory[slot].get("timestamp", 0.0) > SLOT_KEEP_SECONDS:
-            slot_memory.pop(slot, None)
+def _bbox_center_ratio(a: List[float], b: List[float]) -> float:
+    ax1, ay1, ax2, ay2 = a
+    bx1, by1, bx2, by2 = b
+    acx = (ax1 + ax2) * 0.5
+    acy = (ay1 + ay2) * 0.5
+    bcx = (bx1 + bx2) * 0.5
+    bcy = (by1 + by2) * 0.5
+    aw = max(1.0, ax2 - ax1)
+    ah = max(1.0, ay2 - ay1)
+    bw = max(1.0, bx2 - bx1)
+    bh = max(1.0, by2 - by1)
+    diag_ref = max((aw**2 + ah**2) ** 0.5, (bw**2 + bh**2) ** 0.5, 1.0)
+    dist = ((acx - bcx) ** 2 + (acy - bcy) ** 2) ** 0.5
+    return dist / diag_ref
 
 
-def _auto_reassign(tracked_objects: List[Dict[str, object]]) -> None:
+def _extract_descriptor(frame: np.ndarray, bbox: np.ndarray) -> Optional[np.ndarray]:
+    x1, y1, x2, y2 = bbox.astype(int)
+    x1 = max(0, x1)
+    y1 = max(0, y1)
+    x2 = min(frame.shape[1], x2)
+    y2 = min(frame.shape[0], y2)
+    if x2 <= x1 or y2 <= y1:
+        return None
+    roi = frame[y1:y2, x1:x2]
+    if roi.size == 0:
+        return None
+    hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+    hist = cv2.calcHist([hsv], [0, 1], None, [8, 8], [0, 180, 0, 256])
+    if hist is None:
+        return None
+    cv2.normalize(hist, hist)
+    return hist.flatten()
+
+
+def _descriptor_distance(a: Optional[np.ndarray], b: Optional[np.ndarray]) -> float:
+    if a is None or b is None:
+        return 1.0
+    if a.shape != b.shape:
+        return 1.0
+    return float(np.linalg.norm(a - b))
+
+
+def _auto_reassign(
+    tracked_objects: List[Dict[str, object]],
+    descriptors: Dict[int, Optional[np.ndarray]],
+) -> None:
     now = time.time()
     with targets_lock:
+        inactive_slots = {
+            slot: dict(info)
+            for slot, info in slot_memory.items()
+            if info.get("track_id") is None
+        }
         active_ids = set(selected_tracks.keys())
-        slots_in_use = set(selected_tracks.values())
     for obj in tracked_objects:
         track_id = obj["id"]
         if track_id in active_ids:
             continue
+        descriptor = descriptors.get(track_id)
         best_slot = None
-        best_iou = 0.0
-        for slot, info in slot_memory.items():
-            if slot in slots_in_use:
-                continue
-            last_ts = info.get("timestamp", 0.0)
-            bbox_mem = info.get("bbox")
-            if bbox_mem is None or now - last_ts > SLOT_KEEP_SECONDS:
-                continue
-            iou = _bbox_iou(obj["bbox"], bbox_mem)
-            if iou > best_iou:
-                best_iou = iou
+        best_score = -1.0
+        for slot, info in inactive_slots.items():
+            ref_descriptor = info.get("descriptor")
+            score = -1.0
+            if descriptor is not None and ref_descriptor is not None:
+                dist = _descriptor_distance(descriptor, ref_descriptor)
+                if dist <= SLOT_RECALL_DESCRIPTOR:
+                    score = 1.0 - dist
+            else:
+                bbox_mem = info.get("bbox")
+                if bbox_mem is None:
+                    continue
+                current_bbox = obj["bbox"].tolist()
+                iou = _bbox_iou(current_bbox, bbox_mem)
+                if iou >= SLOT_RECALL_IOU:
+                    score = iou
+                else:
+                    center_ratio = _bbox_center_ratio(current_bbox, bbox_mem)
+                    if center_ratio <= SLOT_RECALL_CENTER:
+                        score = max(score, 1.0 - center_ratio)
+            if score > best_score:
+                best_score = score
                 best_slot = slot
-        if best_slot is not None and best_iou >= SLOT_RECALL_IOU:
+        if best_slot is not None:
             with targets_lock:
-                if best_slot not in selected_tracks.values():
-                    selected_tracks[track_id] = best_slot
-                    slots_in_use.add(best_slot)
-                    logger.info(
-                        "Recalled slot %s for track %s (iou %.2f)",
-                        best_slot,
-                        track_id,
-                        best_iou,
-                    )
+                info = slot_memory.get(best_slot)
+                if info is None or info.get("track_id") is not None:
+                    continue
+                selected_tracks[track_id] = best_slot
+                info["track_id"] = track_id
+                info["bbox"] = obj["bbox"].tolist()
+                info["last_seen"] = now
+                if descriptor is not None:
+                    info["descriptor"] = descriptor
+                logger.info("Recalled slot %s for track %s", best_slot, track_id)
+                active_ids.add(track_id)
 
 
 async def mjpeg_frame_generator() -> AsyncGenerator[bytes, None]:
@@ -274,11 +361,14 @@ async def inference_frame_generator() -> AsyncGenerator[bytes, None]:
                                     and det_cls not in allowed_class_ids
                                 ):
                                     continue
+                                conf_val = float(scores[i])
+                                if conf_val < YOLO_MIN_CONF:
+                                    continue
                                 detections_input.append(
                                     {
                                         "bbox": boxes[i],
                                         "cls": det_cls,
-                                        "conf": float(scores[i]),
+                                        "conf": conf_val,
                                     }
                                 )
                     if detections_input:
@@ -290,13 +380,17 @@ async def inference_frame_generator() -> AsyncGenerator[bytes, None]:
                     logger.exception("YOLO inference error")
 
             tracked_objects = tracker.update(detections_input)
-            _auto_reassign(tracked_objects)
+            object_descriptors: Dict[int, Optional[np.ndarray]] = {}
+            for obj in tracked_objects:
+                object_descriptors[obj["id"]] = _extract_descriptor(frame, obj["bbox"])
+            _auto_reassign(tracked_objects, object_descriptors)
             active_ids = [obj["id"] for obj in tracked_objects]
             _prune_selected(active_ids)
-            _expire_slot_memory()
             selected_snapshot = _selected_snapshot()
             selected_map = {
-                item["track_id"]: item["slot"] for item in selected_snapshot
+                item["track_id"]: item["slot"]
+                for item in selected_snapshot
+                if item.get("track_id") is not None
             }
             objects_payload = []
             for obj in tracked_objects:
@@ -322,10 +416,19 @@ async def inference_frame_generator() -> AsyncGenerator[bytes, None]:
                         2,
                         cv2.LINE_AA,
                     )
-                    slot_memory[slot] = {
-                        "bbox": bbox.tolist(),
-                        "timestamp": time.time(),
-                    }
+                    with targets_lock:
+                        info = slot_memory.get(slot, {})
+                        info.update(
+                            {
+                                "track_id": track_id,
+                                "bbox": bbox.tolist(),
+                                "last_seen": time.time(),
+                            }
+                        )
+                        descriptor = object_descriptors.get(track_id)
+                        if descriptor is not None:
+                            info["descriptor"] = descriptor
+                        slot_memory[slot] = info
                 objects_payload.append(
                     {
                         "id": track_id,
@@ -366,6 +469,8 @@ async def inference_frame_generator() -> AsyncGenerator[bytes, None]:
 async def index(request: Request) -> HTMLResponse:
     now = datetime.now()
     camera_settings: Dict[str, object] = camera_streamer.current_settings()
+    with room_lock:
+        room_snapshot = dict(room_settings)
     return templates.TemplateResponse(
         "index.html",
         {
@@ -375,6 +480,7 @@ async def index(request: Request) -> HTMLResponse:
             "now": now,
             "camera_settings": camera_settings,
             "yolo_error": yolo_error,
+            "room_settings": room_snapshot,
         },
     )
 
@@ -420,6 +526,23 @@ async def get_targets() -> JSONResponse:
     )
 
 
+@app.get("/room", response_class=JSONResponse)
+async def get_room() -> JSONResponse:
+    with room_lock:
+        current = dict(room_settings)
+    return JSONResponse({"room": current})
+
+
+@app.post("/room", response_class=JSONResponse)
+async def update_room(payload: RoomSettingsRequest) -> JSONResponse:
+    name = payload.name.strip()
+    with room_lock:
+        room_settings["name"] = name
+        room_settings["updated_at"] = time.time()
+        current = dict(room_settings)
+    return JSONResponse({"status": "ok", "room": current})
+
+
 @app.post("/targets/select", response_class=JSONResponse)
 async def select_target(selection: SelectionRequest) -> JSONResponse:
     if not (0.0 <= selection.x <= 1.0 and 0.0 <= selection.y <= 1.0):
@@ -436,6 +559,28 @@ async def select_target(selection: SelectionRequest) -> JSONResponse:
         {
             "status": result["status"],
             "slot": result["slot"],
+            "track_id": track_id,
+            "selected": _selected_snapshot(),
+        }
+    )
+
+
+@app.delete("/targets/{slot_id}", response_class=JSONResponse)
+async def delete_target(slot_id: int) -> JSONResponse:
+    if not (1 <= slot_id <= MAX_TARGETS):
+        raise HTTPException(status_code=404, detail="slot not found")
+    with targets_lock:
+        info = slot_memory.get(slot_id)
+        if info is None:
+            raise HTTPException(status_code=404, detail="slot not assigned")
+        track_id = info.get("track_id")
+        if track_id is not None:
+            selected_tracks.pop(track_id, None)
+        slot_memory.pop(slot_id, None)
+    return JSONResponse(
+        {
+            "status": "removed",
+            "slot": slot_id,
             "track_id": track_id,
             "selected": _selected_snapshot(),
         }
