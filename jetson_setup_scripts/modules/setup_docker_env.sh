@@ -22,7 +22,7 @@ if [[ "$OFFLINE_INSTALL" == "1" ]]; then
     PIP_WHEEL_DIR="$DEFAULT_WHEEL_DIR"
   fi
 fi
-APP_ENTRY="TORCH_LOAD_WEIGHTS_ONLY=0 uvicorn app.main:app --host 0.0.0.0 --port ${CONTAINER_PORT}"
+APP_ENTRY="TORCH_LOAD_WEIGHTS_ONLY=0 uvicorn app.main:app --host 0.0.0.0 --port ${CONTAINER_PORT} > /workspace/uvicorn.log 2>&1"
 
 info() { printf '\033[1;34m[docker]\033[0m %s\n' "$*"; }
 err() { printf '\033[1;31m[docker ERROR]\033[0m %s\n' "$*" >&2; }

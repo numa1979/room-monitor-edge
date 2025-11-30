@@ -3,39 +3,12 @@
 
 from __future__ import annotations
 
-import importlib
-import inspect
-import pkgutil
 import urllib.request
 from pathlib import Path
 from typing import Iterable
 
-import torch.nn as torch_nn
-import ultralytics.nn as nn_pkg
-from torch.serialization import add_safe_globals
-
-
-def allowlist_serialization_classes() -> None:
-    classes = []
-    for pkg in (nn_pkg, torch_nn):
-        for _, module_name, _ in pkgutil.walk_packages(
-            pkg.__path__, pkg.__name__ + "."
-        ):
-            try:
-                module = importlib.import_module(module_name)
-            except Exception:
-                continue
-            for attr in vars(module).values():
-                if inspect.isclass(attr):
-                    classes.append(attr)
-    if classes:
-        add_safe_globals(classes)
-
-
-allowlist_serialization_classes()
-
 DEFAULT_MODELS: tuple[str, ...] = (
-    "yolov8n.pt",       # Person detection (smallest YOLOv8 model)
+    "yolov8n.pt",  # Person detection (smallest YOLOv8 model)
     "yolov8n-pose.pt",  # Pose estimation variant
 )
 

@@ -4,3 +4,4 @@ app/__pycache__/main.cpython-310.pyc
 .venv/
 opencv_python_headless-4.9.0.80-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl
 app/__pycache__/camera.cpython-310.pyc
+yolov8n.pt

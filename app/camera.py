@@ -14,10 +14,10 @@ class CameraStreamer:
     def __init__(
         self,
         device_index: int = 0,
-        width: int = 1280,
-        height: int = 720,
-        fps: int = 30,
-        jpeg_quality: int = 80,
+        width: int = 960,
+        height: int = 540,
+        fps: int = 20,
+        jpeg_quality: int = 70,
     ) -> None:
         self.device_index = device_index
         self.width = width
@@ -79,7 +79,9 @@ class CameraStreamer:
 
     def current_settings(self) -> Dict[str, int]:
         with self._capture_lock:
-            actual_width = int(self._capture.get(cv2.CAP_PROP_FRAME_WIDTH) or self.width)
+            actual_width = int(
+                self._capture.get(cv2.CAP_PROP_FRAME_WIDTH) or self.width
+            )
             actual_height = int(
                 self._capture.get(cv2.CAP_PROP_FRAME_HEIGHT) or self.height
             )

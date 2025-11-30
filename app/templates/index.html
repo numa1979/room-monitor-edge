@@ -95,26 +95,14 @@
         'quality': '-'
     } %}
     <section class="card">
-        <span class="tag">ライブ映像</span>
-        <div class="camera-preview">
-            <img id="cameraFeed" src="/camera/stream" alt="Jetson camera preview">
-        </div>
-        <p class="camera-config-status">
-            現在: {{ settings.width }}x{{ settings.height }} @ {{ settings.fps }}fps / 品質 {{ settings.quality }}
-        </p>
-        <p class="camera-status" id="cameraStatus">
-            USBカメラの映像をMJPEG形式で配信しています。
-        </p>
-    </section>
-    <section class="card">
         <span class="tag">接続状態</span>
         <p class="status">ONLINE</p>
-        <p>Jetsonが応答中です。ここから監視UIを作り込んでいきます。</p>
+        <p>Jetsonが応答中です。{{ settings.width }}x{{ settings.height }} / {{ settings.fps }}fps で配信中です。</p>
     </section>
     <section class="card">
         <span class="tag">推論結果プレビュー</span>
         <div class="camera-preview">
-            <img id="inferenceFeed" src="/camera/inference" alt="Inference preview">
+            <img id="inferenceFeed" src="/camera/inference" alt="Inference preview" style="cursor: pointer;">
         </div>
         <p class="camera-status">
             {% if yolo_error %}
@@ -122,6 +110,9 @@
             {% else %}
                 YOLOv8 の推論結果（バウンディングボックス/姿勢オーバーレイ）を表示しています。
             {% endif %}
+        </p>
+        <p class="camera-status" id="targetStatus">
+            監視対象: なし（推論プレビューをタップして選択）
         </p>
     </section>
     <section class="card">
@@ -134,24 +125,58 @@
     &copy; {{ now.year }} Jetson Watchdog Prototype
 </footer>
 <script>
-    const feed = document.getElementById("cameraFeed");
-    const status = document.getElementById("cameraStatus");
-    if (feed && status) {
-        let failureTimer = null;
+    const inferenceFeed = document.getElementById("inferenceFeed");
+    const targetStatus = document.getElementById("targetStatus");
+    const formatTargets = (selected) => {
+        if (!targetStatus) return;
+        const slots = Array.isArray(selected) ? selected.map((s) => s.slot).filter(Boolean) : [];
+        if (slots.length === 0) {
+            targetStatus.textContent = "監視対象: なし（推論プレビューをタップして選択）";
+        } else {
+            targetStatus.textContent = `監視対象: ${slots.join(", ")}`;
+        }
+    };
 
-        const markError = () => {
-            status.textContent = "映像を取得できません。カメラ接続とデバイスパス(/dev/video0)を確認してください。";
-        };
+    const refreshTargets = async () => {
+        try {
+            const res = await fetch("/targets");
+            if (!res.ok) return;
+            const data = await res.json();
+            formatTargets(data.selected);
+        } catch (error) {
+            // ignore
+        }
+    };
 
-        feed.addEventListener("error", markError);
-        feed.addEventListener("load", () => {
-            clearTimeout(failureTimer);
-            status.textContent = "USBカメラの映像をMJPEG形式で配信しています。";
+    if (inferenceFeed) {
+        inferenceFeed.addEventListener("click", async (event) => {
+            const rect = inferenceFeed.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / rect.width;
+            const y = (event.clientY - rect.top) / rect.height;
+            try {
+                const res = await fetch("/targets/select", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ x, y })
+                });
+                const data = await res.json();
+                if (data.status === "full" && targetStatus) {
+                    targetStatus.textContent = "監視対象は最大4人までです。対象を解除してから追加してください。";
+                } else if (data.status === "not_found" && targetStatus) {
+                    targetStatus.textContent = "クリック位置で検出対象を特定できませんでした。もう一度お試しください。";
+                } else {
+                    formatTargets(data.selected);
+                }
+            } catch (error) {
+                if (targetStatus) {
+                    targetStatus.textContent = "監視対象の更新に失敗しました。";
+                }
+            }
         });
-
-        failureTimer = setTimeout(markError, 5000);
     }
 
+    refreshTargets();
+    setInterval(refreshTargets, 5000);
 </script>
 </body>
 </html>
