@@ -73,6 +73,7 @@ Host jetson-nano
 ```
 - Windows でホスト鍵を保存しない場合は `UserKnownHostsFile NUL` を追加。  
 - 接続すると 22.04 コンテナ内で `/workspace` がリポジトリルート。
+- ホスト (18.04) 側は mDNS を有効化しているため、同じネットでは `jetson.local` などホスト名で到達可能。
 
 ## 本番環境 (18.04 ホスト上)
 Jetson 上で以下を実行:

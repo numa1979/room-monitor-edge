@@ -7,4 +7,8 @@ sudo apt install -y \
   ca-certificates libnss3 libnss3-tools \
   python3 python3-venv python3-pip \
   libgl1 \
-  chromium-codecs-ffmpeg-extra
+  chromium-codecs-ffmpeg-extra \
+  avahi-daemon
+
+# mDNS で <hostname>.local へ名前解決できるようにする
+sudo systemctl enable --now avahi-daemon
