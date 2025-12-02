@@ -67,7 +67,7 @@ start_container() {
       "${device_args[@]}" \
       -w /workspace \
       "$IMAGE_NAME" \
-      bash -c "tail -f /dev/null" >/dev/null
+      bash -lc "service ssh start >/dev/null 2>&1 || true; tail -f /dev/null" >/dev/null
   fi
 
   if ! "${DOCKER[@]}" ps --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"; then
